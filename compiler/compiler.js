@@ -284,8 +284,6 @@ class Compiler {
                 token = this.tokens[current];
             }
 
-            console.log(token);
-
             // If we are no longer inside the body set the flag to false
             if (wsCount !== tabCount) {
                 return false;
@@ -298,7 +296,7 @@ class Compiler {
         let getWhiteSpaceCount = () => {
             let wsCount = 0;
             let token = this.tokens[current];
-            if (token.type === "Tab") {
+            if (token.type === "Tab" && this.tokens[current - 1].type === "Newline") {
                 while (token.type === "Tab") {
                     wsCount++;
                     current++;
@@ -381,6 +379,7 @@ class Compiler {
                     while (inBody) {
 
                         // First add expressions
+                        token = this.tokens[current];
                         while (token.type !== "Newline") {
                             newNode.body.push(walk());
                             token = this.tokens[current]
@@ -413,8 +412,8 @@ class Compiler {
                 while (token.type !== "Newline") {
                     newNode.body.push(walk());
                     token = this.tokens[current];
+                    console.log("RETURN", token);
                 }
-                current++;
                 return newNode;
             }
 
@@ -434,7 +433,6 @@ class Compiler {
                     newNode.body.push(walk());
                     token = this.tokens[current];
                 }
-                current++;
                 return newNode;
             }
 
@@ -480,11 +478,11 @@ class Compiler {
                 return newNode;
             }
 
-            // Array literals
+            // Object literals
             if (token.type === "LBrace") {
                 current++;
                 let newNode = {
-                    type: "ArrayLiteral",
+                    type: "ObjectLiteral",
                     body: []
                 };
 
@@ -541,7 +539,7 @@ class Compiler {
             }
 
             // If expressions
-            console.log(token.type);
+            // console.log(token.type);
             if (token.type === "If") {
                 console.log(token);
                 current++;
@@ -588,13 +586,16 @@ class Compiler {
                     type: 'ElseStatement',
                     body: []
                 };
-                if (this.tokens[current + 1].type !== 'Newline') {
+                if (token.type !== 'Newline') {
                     while (token.type !== 'Newline') {
                         newNode.body.push(walk());
                     }
                 }
                 else {
+                    current++;
                     let wsCount = getWhiteSpaceCount();
+
+                    token = this.tokens[current];
                     expressionStack.push(wsCount);
 
                     let inBody = true;

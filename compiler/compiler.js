@@ -22,7 +22,7 @@ let reserved = {
         type:  "Newline",
         value: "\n",
     },
-    "|": {	
+    "|": {
         type:  "Pipe",
         value: "|",
     },
@@ -36,7 +36,7 @@ let reserved = {
     },
     "==": {
         type:  "Eq",
-        value: "=",
+        value: "==",
     },
     "=": {
         type:  "Assign",
@@ -76,6 +76,25 @@ let reserved = {
     },
 }
 
+let reservedWords = {
+    'return': {
+        type: "Return",
+        value: "return"
+    },
+    'if': {
+        type: 'If',
+        value: 'if'
+    },
+    'then': {
+        type: 'Then',
+        value: 'then'
+    },
+    'else': {
+        type: 'Else',
+        value: 'else'
+    }
+}
+
 class Compiler {
     constructor(input) {
         this.tokens = [];
@@ -92,7 +111,7 @@ class Compiler {
 
     compile() {
         this.lexer();
-        console.log(this.tokens)
+        console.log(this.tokens);
         this.parser();
         console.log(JSON.stringify(this.ast));
     }
@@ -151,7 +170,7 @@ class Compiler {
             }
         }
 
-        // Loop over input until finished 
+        // Loop over input until finished
         while (current < len) {
             let char = this.input[current]
 
@@ -162,7 +181,7 @@ class Compiler {
                     current += 2;
                     continue;
                 }
-            } 
+            }
 
             let peek = reserved[char];
             if (peek !== undefined) {
@@ -195,14 +214,14 @@ class Compiler {
 
             // If there is a space after a newline treat it as a tab
             if (char === WHITESPACE && current > 1) {
-                if (this.tokens[this.tokens.length-1].type === "Newline") {
+                // if (this.tokens[this.tokens.length-1].type === "Newline") {
                     this.tokens.push({
                         type: "Tab",
                         value: "\t"
                     });
                     current++;
                     continue;
-                }
+                // }
             }
 
             if (char !== WHITESPACE) {
@@ -216,10 +235,18 @@ class Compiler {
                     current++;
                     char = this.input[current];
                 }
-                this.tokens.push({
-                    type: "Ident",
-                    value: value
-                });
+                if (reservedWords[value] !== undefined) {
+                    this.tokens.push({
+                        type: reservedWords[value].type,
+                        value: reservedWords[value].value
+                    });
+                }
+                else {
+                    this.tokens.push({
+                        type: "Ident",
+                        value: value
+                    });
+                }
                 current++;
                 continue;
             }
@@ -238,9 +265,55 @@ class Compiler {
         let current = 0;
 
         // A couple of parsing flags
-        let parserInBody = false;
-        let inMethodParams = false;
         let expressionStack = []
+
+        let checkWhiteSpace = () => {
+            // First check if there are extraneous new lines
+            while (this.tokens[current + 1].type === "Newline") {
+                current++;
+            }
+
+            // Now check if we are still in the body
+            let wsCount = 0;
+            let tabCount = expressionStack[expressionStack.length - 1]
+            current++;
+            let token = this.tokens[current];
+            while (token.type === "Tab") {
+                wsCount++;
+                current++;
+                token = this.tokens[current];
+            }
+
+            console.log(token);
+
+            // If we are no longer inside the body set the flag to false
+            if (wsCount !== tabCount) {
+                return false;
+            }
+            else {
+                return true;
+            }
+        }
+
+        let getWhiteSpaceCount = () => {
+            let wsCount = 0;
+            let token = this.tokens[current];
+            if (token.type === "Tab") {
+                while (token.type === "Tab") {
+                    wsCount++;
+                    current++;
+                    token = this.tokens[current];
+                }
+            }
+            else if (token.type === "Space") {
+                while (token.type === "Space") {
+                    wsCount++;
+                    current++;
+                    token = this.tokens[current];
+                }
+            }
+            return wsCount;
+        }
 
         // Traversing function
         let walk = () => {
@@ -296,29 +369,13 @@ class Compiler {
                     token = this.tokens[current];
 
                     // We'll have to keep track of indentation levels
-                    let wsCount = 0;
-                    if (token.type === "Tab") {
-                        while (token.type === "Tab") {
-                            wsCount++;
-                            current++;
-                            token = this.tokens[current];
-                        }
-                    }
-                    else if (token.type === "Space") {
-                        while (token.type === "Space") {
-                            wsCount++;
-                            current++;
-                            token = this.tokens[current];
-                        }
-                    }
+                    let wsCount = getWhiteSpaceCount();
 
                     // We push the white space count to the expression array
                     // so that we can keep track of indentation of each func def
                     // TODO: ignore newlines immediately proceeded by newlines
                     expressionStack.push(wsCount);
-                    current++;
-                    token = this.tokens[current];
-                    
+
                     // Set a flag for checking if we're still in the func body
                     let inBody = true;
                     while (inBody) {
@@ -329,31 +386,10 @@ class Compiler {
                             token = this.tokens[current]
                         }
 
-                        // First check if there are extraneous new lines
-                        while (this.tokens[current + 1].type === "Newline") {
-                            current++;
-                        }
-
-                        // Now check if we are still in the body
-                        let wsCount = 0;
-                        let tabCount = expressionStack[expressionStack.length - 1]
-                        current++;
-                        token = this.tokens[current];
-                        while (token.type === "Tab") {
-                            wsCount++;
-                            current++;
-                            token = this.tokens[current];
-                        }
-
-                        // If we are no longer inside the body set the flag to false
-                        if (wsCount !== tabCount) {
-                            inBody = false;
-                            break;
-                        }
+                        inBody = checkWhiteSpace()
                     }
-                    
+
                     expressionStack.pop();
-                    console.log("HERE WE ARE ", token);
                     return newNode;
                 }
             }
@@ -376,7 +412,7 @@ class Compiler {
                 token = this.tokens[current];
                 while (token.type !== "Newline") {
                     newNode.body.push(walk());
-                    token = this.tokens[current];                    
+                    token = this.tokens[current];
                 }
                 current++;
                 return newNode;
@@ -414,10 +450,10 @@ class Compiler {
                     newNode.body.push(walk());
                     token = this.tokens[current];
 
-                    while (token.type === "Tab" || token.type === "Newline") {
-                        current++;
-                        token = this.tokens[current];
-                    }
+                    // while (token.type === "Tab" || token.type === "Newline") {
+                    //     current++;
+                    //     token = this.tokens[current];
+                    // }
                 }
 
                 return newNode;
@@ -432,18 +468,15 @@ class Compiler {
                 };
                 token = this.tokens[current];
 
-                while (token.type !== "Rparen") {       
+                while (token.type !== "Rparen") {
                     newNode.body.push(walk());
                     token = this.tokens[current];
-                    
-                                        while (token.type === "Tab" || token.type === "Newline") {
-                                            current++;
-                                            token = this.tokens[current];
-                                        }             
-                    console.log(token);
-                }
-                console.log("OUT OF PAREN");
 
+                    // while (token.type === "Tab" || token.type === "Newline") {
+                    //     current++;
+                    //     token = this.tokens[current];
+                    // }
+                }
                 return newNode;
             }
 
@@ -460,10 +493,10 @@ class Compiler {
                     token = this.tokens[current];
                     current++;
 
-                    while (token.type === "Tab" || token.type === "Newline") {
-                        current++;
-                        token = this.tokens[current];
-                    } 
+                    // while (token.type === "Tab" || token.type === "Newline") {
+                    //     current++;
+                    //     token = this.tokens[current];
+                    // }
                 }
 
                 return newNode;
@@ -505,6 +538,77 @@ class Compiler {
                     type: "Ident",
                     value: token.value
                 };
+            }
+
+            // If expressions
+            console.log(token.type);
+            if (token.type === "If") {
+                console.log(token);
+                current++;
+                token = this.tokens[current];
+                let newNode = {
+                    type: 'IfStatement',
+                    condition: [],
+                    body: []
+                };
+                while (token.type !== 'Newline' && token.type !== "Then") {
+                    newNode.condition.push(walk());
+                    token = this.tokens[current];
+                }
+                if (token.type === 'Then') {
+                    current++;
+                    token = this.tokens[current];
+                    while (token.type !== 'Newline' && token.type !== 'Else') {
+                        newNode.body.push(walk());
+                        token = this.tokens[current];
+                    }
+                }
+                else {
+                    let wsCount = getWhiteSpaceCount();
+                    expressionStack.push(wsCount);
+
+                    let inBody = true;
+                    while (inBody) {
+                        while (token.type !== 'Newline') {
+                            newNode.body.push(walk());
+                            token = this.tokens[current];
+                        }
+
+                        inBody = checkWhiteSpace();
+                    }
+                    expressionStack.pop();
+                    return newNode;
+                }
+            }
+
+            if (token.type === 'Else') {
+                current++;
+                token = this.tokens[current];
+                let newNode = {
+                    type: 'ElseStatement',
+                    body: []
+                };
+                if (this.tokens[current + 1].type !== 'Newline') {
+                    while (token.type !== 'Newline') {
+                        newNode.body.push(walk());
+                    }
+                }
+                else {
+                    let wsCount = getWhiteSpaceCount();
+                    expressionStack.push(wsCount);
+
+                    let inBody = true;
+                    while (inBody) {
+                        while(token.type !== 'Newline') {
+                            newNode.body.push(walk());
+                            token = this.tokens[current];
+                        }
+                        inBody = checkWhiteSpace();
+                    }
+
+                    expressionStack.pop();
+                    return newNode;
+                }
             }
 
             current++;

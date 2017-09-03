@@ -40,6 +40,10 @@ testOne = (x) -> return x + 1
 test = ->
   x = testOne(1)
   print(x)
+  if x == 1
+    return x
+  else
+    return false
 `;
 
 let c = new compiler.Compiler(input);

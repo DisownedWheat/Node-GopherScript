@@ -269,7 +269,7 @@ class Compiler {
 
         let checkWhiteSpace = () => {
             // First check if there are extraneous new lines
-            while (this.tokens[current + 1].type === "Newline") {
+            while (this.tokens[current + 1].type === "Newline" || this.tokens[current+1].type !== "EOF") {
                 current++;
             }
 
@@ -412,7 +412,6 @@ class Compiler {
                 while (token.type !== "Newline") {
                     newNode.body.push(walk());
                     token = this.tokens[current];
-                    console.log("RETURN", token);
                 }
                 return newNode;
             }
@@ -541,7 +540,6 @@ class Compiler {
             // If expressions
             // console.log(token.type);
             if (token.type === "If") {
-                console.log(token);
                 current++;
                 token = this.tokens[current];
                 let newNode = {
